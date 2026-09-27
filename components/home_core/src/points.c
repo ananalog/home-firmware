@@ -13,6 +13,7 @@ static const char *TAG = "points";
 static hp_value_t *s_values;
 static bool *s_known;
 static SemaphoreHandle_t s_lock;
+static SemaphoreHandle_t s_send_lock;  // guards the shared REPORT/STATE buffer
 
 typedef struct {
     uint8_t point;
@@ -79,6 +80,7 @@ static bool load(uint8_t id, hp_value_t *out)
 void points_init(void)
 {
     s_lock = xSemaphoreCreateMutex();
+    s_send_lock = xSemaphoreCreateMutex();
     s_values = calloc(g_dev->n_points, sizeof *s_values);
     s_known = calloc(g_dev->n_points, sizeof *s_known);
     for (size_t i = 0; i < g_dev->n_points; i++) {
@@ -202,16 +204,14 @@ esp_err_t points_set(uint8_t id, const hp_value_t *in, hp_value_t *applied, uint
 static void send_samples(const uint8_t type, void (*fill)(htlv_writer_t *w, void *ctx), void *ctx)
 {
     static uint8_t buf[MSG_MAX];
-    static SemaphoreHandle_t lock;
-    if (!lock) lock = xSemaphoreCreateMutex();
-    xSemaphoreTake(lock, portMAX_DELAY);
+    xSemaphoreTake(s_send_lock, portMAX_DELAY);
     htlv_writer_t w;
     htlv_w_init(&w, buf, sizeof buf);
     hp_header_t h = {.ver = HP_HEADER_VERSION, .type = type, .flags = HP_FLAGS_NOACK, .req_id = 0};
     hp_header_write(&w, &h);
     fill(&w, ctx);
     if (!w.overflow) link_send(buf, w.len);
-    xSemaphoreGive(lock);
+    xSemaphoreGive(s_send_lock);
 }
 
 static void fill_all(htlv_writer_t *w, void *ctx) { points_write_samples(w, NULL, 0); }

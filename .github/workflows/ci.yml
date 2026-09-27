@@ -1,0 +1,37 @@
+name: ci
+on:
+  push:
+    branches: [main]
+    tags: ['*/v*']
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    container: espressif/idf:v5.4.2
+    strategy:
+      matrix:
+        device: [co2-egg, board-probe]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - name: Host tests
+        run: tests/host/run.sh
+      - name: Build
+        shell: bash
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/external/home-protocol"
+          . $IDF_PATH/export.sh
+          ./scripts/fw-build.sh ${{ matrix.device }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.device }}
+          path: dist/${{ matrix.device }}
+      - name: Release
+        if: startsWith(github.ref, format('refs/tags/{0}/v', matrix.device))
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/${{ matrix.device }}/*/*

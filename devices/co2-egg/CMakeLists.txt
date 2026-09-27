@@ -1,0 +1,10 @@
+cmake_minimum_required(VERSION 3.16)
+set(EXTRA_COMPONENT_DIRS "${CMAKE_CURRENT_LIST_DIR}/../../components")
+# Version: FW_VERSION from the build script (git tag), else version.txt.
+if(DEFINED ENV{FW_VERSION})
+    set(PROJECT_VER "$ENV{FW_VERSION}")
+else()
+    file(STRINGS "${CMAKE_CURRENT_LIST_DIR}/version.txt" PROJECT_VER LIMIT_COUNT 1)
+endif()
+include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+project(co2-egg)

@@ -1,0 +1,3 @@
+[submodule "external/home-protocol"]
+	path = external/home-protocol
+	url = https://github.com/ananalog/home-protocol
